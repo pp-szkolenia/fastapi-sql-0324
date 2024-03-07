@@ -1,27 +1,26 @@
-from fastapi import APIRouter, HTTPException, status, Response
+from fastapi import APIRouter, HTTPException, status, Response, Depends
 from fastapi.responses import JSONResponse
 import random
+from sqlalchemy.orm import Session
 
 from app.utils import get_item_by_id, get_item_index_by_id
 from app.models import UserBody
+from db.orm import get_session
+from db.models import UserTable
 
 
 router = APIRouter()
 
-users_data = [
-    {"id": 1, "username": "Andrzej", "password": "qwerty123", "is_admin": True},
-    {"id": 2, "username": "Andżela", "password": "hasło1!", "is_admin": False},
-]
-
 
 @router.get("/users/", tags=["users"])
-def get_users():
+def get_users(session: Session = Depends(get_session)):
+    users_data = session.query(UserTable).all()
     return JSONResponse(status_code=status.HTTP_200_OK, content={"result": users_data})
 
 
 @router.get("/users/{id_}", tags=["users"])
-def get_user_by_id(id_: int):
-    target_user = get_item_by_id(users_data, id_)
+def get_user_by_id(id_: int, session: Session = Depends(get_session)):
+    target_user = session.query(UserTable).filter_by(id_number=id_).first()
 
     if not target_user:
         message = {"error": f"User with id {id_} does not exist"}
@@ -31,39 +30,42 @@ def get_user_by_id(id_: int):
 
 
 @router.post("/users/", status_code=status.HTTP_201_CREATED, tags=["users"])
-def create_user(body: UserBody):
-    new_user = body.model_dump()
-    random_id = random.randint(1, 10000)
-    new_user["id"] = random_id
-
-    users_data.append(new_user)
+def create_user(body: UserBody, session: Session = Depends(get_session)):
+    user_dict = body.model_dump()
+    new_user = UserTable(**user_dict)
+    session.add(new_user)
+    session.commit()
+    session.refresh(new_user)
 
     return {"message": "New user added", "details": new_user}
 
 
 @router.delete("/users/{id_}", tags=["users"])
-def delete_user_by_id(id_: int):
-    target_index = get_item_index_by_id(users_data, id_)
+def delete_user_by_id(id_: int, session: Session = Depends(get_session)):
+    deleted_user = session.query(UserTable).filter_by(id_number=id_).first()
 
-    if target_index is None:
+    if deleted_user is None:
         message = {"error": f"User with id {id_} does not exist"}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message)
 
-    users_data.pop(target_index)
+    session.delete(deleted_user)
+    session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.put("/users/{id_}", tags=["users"])
-def update_user_by_id(id_: int, body: UserBody):
-    target_index = get_item_index_by_id(users_data, id_)
+def update_user_by_id(id_: int, body: UserBody, session: Session = Depends(get_session)):
+    filter_query = session.query(UserTable).filter_by(id_number=id_)
 
-    if target_index is None:
+    if filter_query.first() is None:
         message = {"error": f"User with id {id_} does not exist"}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message)
 
-    updated_user = body.model_dump()
-    updated_user["id"] = id_
-    users_data[target_index] = updated_user
+    print(body.model_dump())
+    filter_query.update(body.model_dump())
+    session.commit()
+
+    updated_user = dict(filter_query.first())
 
     message = {"message": f"User with id {id_} updated", "new_value": updated_user}
     return JSONResponse(status_code=status.HTTP_200_OK, content=message)
