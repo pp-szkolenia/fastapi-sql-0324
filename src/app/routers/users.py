@@ -15,7 +15,8 @@ router = APIRouter()
 @router.get("/users/", tags=["users"])
 def get_users(session: Session = Depends(get_session)):
     users_data = session.query(UserTable).all()
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"result": users_data})
+    # return JSONResponse(status_code=status.HTTP_200_OK, content={"result": users_data})
+    return {"result": users_data}
 
 
 @router.get("/users/{id_}", tags=["users"])
@@ -26,7 +27,7 @@ def get_user_by_id(id_: int, session: Session = Depends(get_session)):
         message = {"error": f"User with id {id_} does not exist"}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message)
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"result": target_user})
+    return {"result": target_user}
 
 
 @router.post("/users/", status_code=status.HTTP_201_CREATED, tags=["users"])
@@ -65,7 +66,8 @@ def update_user_by_id(id_: int, body: UserBody, session: Session = Depends(get_s
     filter_query.update(body.model_dump())
     session.commit()
 
-    updated_user = dict(filter_query.first())
+    updated_user = filter_query.first()
 
     message = {"message": f"User with id {id_} updated", "new_value": updated_user}
-    return JSONResponse(status_code=status.HTTP_200_OK, content=message)
+    # return JSONResponse(status_code=status.HTTP_200_OK, content=message)
+    return message
