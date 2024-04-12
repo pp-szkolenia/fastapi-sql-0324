@@ -62,7 +62,6 @@ def update_user_by_id(id_: int, body: UserBody, session: Session = Depends(get_s
         message = {"error": f"User with id {id_} does not exist"}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message)
 
-    print(body.model_dump())
     filter_query.update(body.model_dump())
     session.commit()
 
